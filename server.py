@@ -16,12 +16,24 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nourish.db')
-SECRET_KEY = secrets.token_hex(32)
+# Vercel serverless only allows writes to /tmp. Locally use project folder.
+if os.environ.get('VERCEL'):
+    DATABASE = '/tmp/nourish.db'
+else:
+    DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nourish.db')
+
+SECRET_KEY = os.environ.get('NOURISH_SECRET') or secrets.token_hex(32)
+
+# Ensure DB is initialized on every cold start (Vercel wipes /tmp)
+_db_initialized = False
 
 # ─── Database Helpers ───────────────────────────────────────────────
 
 def get_db():
+    global _db_initialized
+    if not _db_initialized:
+        init_db()
+        _db_initialized = True
     if 'db' not in g:
         g.db = sqlite3.connect(DATABASE)
         g.db.row_factory = sqlite3.Row
@@ -172,13 +184,19 @@ def login_required(f):
 
 # ─── Static File Serving ────────────────────────────────────────────
 
+STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
+
 @app.route('/')
 def serve_index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory(STATIC_DIR, 'index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
-    return send_from_directory('.', path)
+    full = os.path.join(STATIC_DIR, path)
+    if os.path.isfile(full):
+        return send_from_directory(STATIC_DIR, path)
+    # Fallback to index.html for SPA-style routing
+    return send_from_directory(STATIC_DIR, 'index.html')
 
 # ─── Auth API ───────────────────────────────────────────────────────
 

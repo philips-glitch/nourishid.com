@@ -51,6 +51,13 @@ Open http://localhost:8080
 | GET/POST | `/api/favorites` | Favorite menus |
 | GET | `/api/progress` | Multi-day progress summary |
 
+## Vercel Deployment
+
+`vercel.json` is configured for `@vercel/python` with Flask. On Vercel:
+- SQLite DB is written to `/tmp/nourish.db` (only writable path in serverless)
+- **IMPORTANT:** `/tmp` is ephemeral — data will be lost between cold starts. For persistent data on Vercel, swap SQLite for Vercel Postgres, Turso, Supabase, or Neon.
+- Set env var `NOURISH_SECRET` for a stable session signing key.
+
 ## Google Sign-In Setup
 
 Replace `YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com` in `index.html` with your real client ID from [Google Cloud Console](https://console.cloud.google.com/apis/credentials).

@@ -51,12 +51,26 @@ Open http://localhost:8080
 | GET/POST | `/api/favorites` | Favorite menus |
 | GET | `/api/progress` | Multi-day progress summary |
 
-## Vercel Deployment
+## Vercel Deployment with Neon Postgres (Persistent)
 
-`vercel.json` is configured for `@vercel/python` with Flask. On Vercel:
-- SQLite DB is written to `/tmp/nourish.db` (only writable path in serverless)
-- **IMPORTANT:** `/tmp` is ephemeral — data will be lost between cold starts. For persistent data on Vercel, swap SQLite for Vercel Postgres, Turso, Supabase, or Neon.
-- Set env var `NOURISH_SECRET` for a stable session signing key.
+The backend supports **two database modes**:
+- If `POSTGRES_URL` (or `DATABASE_URL`) env var is set → Neon / Postgres (persistent)
+- Otherwise → local SQLite (dev only)
+
+### Setup on Vercel
+
+1. **Import the repo** into Vercel (`vercel.com/new` → pick this repo).
+2. **Add Neon Postgres:**
+   - Open your project → **Storage** tab → **Create Database** → **Neon Postgres**
+   - Vercel auto-injects `POSTGRES_URL`, `DATABASE_URL`, and related env vars into your deployment.
+3. **(Optional)** Set `NOURISH_SECRET` env var for a stable session signing key.
+4. **Redeploy** — schema auto-creates on first request.
+
+### How it works
+- `server.py` picks Postgres when `POSTGRES_URL` / `DATABASE_URL` is present, else falls back to SQLite.
+- Schema is dialect-aware: `SERIAL PRIMARY KEY` for Postgres, `INTEGER PRIMARY KEY AUTOINCREMENT` for SQLite.
+- `RETURNING id` + `ON CONFLICT … DO UPDATE` portable across both dialects.
+- A tiny adapter translates `?` placeholders to `%s` for `psycopg`.
 
 ## Google Sign-In Setup
 

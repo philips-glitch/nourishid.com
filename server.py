@@ -1,12 +1,16 @@
 """
-NOURISH Diet Program — Flask Backend with SQLite Database
+NOURISH Diet Program — Flask backend with dual-DB support.
+
+- If POSTGRES_URL / DATABASE_URL is set  -> Neon Postgres (production / Vercel)
+- Otherwise                              -> local SQLite (dev)
+
+Schema stays identical across both dialects; a tiny adapter translates the
+`?` placeholders used in code to `%s` for Postgres.
 """
 
 import os
-import sqlite3
-import hashlib
 import secrets
-import json
+import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -16,18 +20,67 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Vercel serverless only allows writes to /tmp. Locally use project folder.
-if os.environ.get('VERCEL'):
-    DATABASE = '/tmp/nourish.db'
+# ─── DB Selection ───────────────────────────────────────────────────
+
+POSTGRES_URL = (
+    os.environ.get('POSTGRES_URL')
+    or os.environ.get('POSTGRES_PRISMA_URL')
+    or os.environ.get('DATABASE_URL')
+)
+USE_POSTGRES = bool(POSTGRES_URL)
+
+if USE_POSTGRES:
+    import psycopg
+    from psycopg.rows import dict_row
+    PLACEHOLDER = '%s'
+    ID_COL = 'SERIAL PRIMARY KEY'
 else:
-    DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nourish.db')
+    import sqlite3
+    if os.environ.get('VERCEL'):
+        SQLITE_PATH = '/tmp/nourish.db'
+    else:
+        SQLITE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nourish.db')
+    PLACEHOLDER = '?'
+    ID_COL = 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
 SECRET_KEY = os.environ.get('NOURISH_SECRET') or secrets.token_hex(32)
-
-# Ensure DB is initialized on every cold start (Vercel wipes /tmp)
+STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
 _db_initialized = False
 
-# ─── Database Helpers ───────────────────────────────────────────────
+
+def _q(sql):
+    """Translate ? placeholders to the active dialect."""
+    return sql.replace('?', PLACEHOLDER) if PLACEHOLDER != '?' else sql
+
+
+def _connect():
+    if USE_POSTGRES:
+        return psycopg.connect(POSTGRES_URL, row_factory=dict_row, autocommit=False)
+    conn = sqlite3.connect(SQLITE_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA foreign_keys=ON')
+    return conn
+
+
+class Db:
+    def __init__(self):
+        self.conn = _connect()
+
+    def execute(self, sql, params=()):
+        cur = self.conn.cursor()
+        cur.execute(_q(sql), params)
+        return cur
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+
 
 def get_db():
     global _db_initialized
@@ -35,11 +88,9 @@ def get_db():
         init_db()
         _db_initialized = True
     if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute('PRAGMA journal_mode=WAL')
-        g.db.execute('PRAGMA foreign_keys=ON')
+        g.db = Db()
     return g.db
+
 
 @app.teardown_appcontext
 def close_db(exception):
@@ -47,33 +98,30 @@ def close_db(exception):
     if db is not None:
         db.close()
 
+
 def init_db():
-    db = sqlite3.connect(DATABASE)
-    db.execute('PRAGMA journal_mode=WAL')
-    db.execute('PRAGMA foreign_keys=ON')
-    db.executescript('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conn = _connect()
+    cur = conn.cursor()
+    statements = [
+        f'''CREATE TABLE IF NOT EXISTS users (
+            id {ID_COL},
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT,
             provider TEXT NOT NULL DEFAULT 'email',
             avatar TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+        )''',
+        f'''CREATE TABLE IF NOT EXISTS sessions (
+            id {ID_COL},
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             token TEXT UNIQUE NOT NULL,
             expires_at TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS calorie_profiles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''',
+        f'''CREATE TABLE IF NOT EXISTS calorie_profiles (
+            id {ID_COL},
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             gender TEXT NOT NULL,
             age INTEGER NOT NULL,
             height REAL NOT NULL,
@@ -88,55 +136,48 @@ def init_db():
             protein_g INTEGER,
             carbs_g INTEGER,
             fats_g INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS food_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''',
+        f'''CREATE TABLE IF NOT EXISTS food_logs (
+            id {ID_COL},
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             calories INTEGER NOT NULL,
             label TEXT,
             logged_date DATE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS water_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''',
+        f'''CREATE TABLE IF NOT EXISTS water_logs (
+            id {ID_COL},
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             glasses INTEGER NOT NULL DEFAULT 0,
             logged_date DATE NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             UNIQUE(user_id, logged_date)
-        );
-
-        CREATE TABLE IF NOT EXISTS workout_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+        )''',
+        f'''CREATE TABLE IF NOT EXISTS workout_logs (
+            id {ID_COL},
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             exercise_name TEXT NOT NULL,
             completed INTEGER NOT NULL DEFAULT 0,
             logged_date DATE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS favorite_menus (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''',
+        f'''CREATE TABLE IF NOT EXISTS favorite_menus (
+            id {ID_COL},
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             menu_id INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             UNIQUE(user_id, menu_id)
-        );
+        )''',
+        'CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)',
+        'CREATE INDEX IF NOT EXISTS idx_food_logs_user_date ON food_logs(user_id, logged_date)',
+        'CREATE INDEX IF NOT EXISTS idx_water_logs_user_date ON water_logs(user_id, logged_date)',
+        'CREATE INDEX IF NOT EXISTS idx_workout_logs_user_date ON workout_logs(user_id, logged_date)',
+    ]
+    for s in statements:
+        cur.execute(s)
+    conn.commit()
+    conn.close()
 
-        CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
-        CREATE INDEX IF NOT EXISTS idx_food_logs_user_date ON food_logs(user_id, logged_date);
-        CREATE INDEX IF NOT EXISTS idx_water_logs_user_date ON water_logs(user_id, logged_date);
-        CREATE INDEX IF NOT EXISTS idx_workout_logs_user_date ON workout_logs(user_id, logged_date);
-    ''')
-    db.commit()
-    db.close()
 
 # ─── Auth Helpers ───────────────────────────────────────────────────
 
@@ -145,10 +186,15 @@ def hash_password(password):
     hashed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
     return f"{salt}:{hashed.hex()}"
 
+
 def verify_password(password, stored):
-    salt, hashed = stored.split(':')
-    check = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
-    return check.hex() == hashed
+    try:
+        salt, hashed = stored.split(':')
+        check = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+        return check.hex() == hashed
+    except Exception:
+        return False
+
 
 def create_session(user_id):
     token = secrets.token_urlsafe(48)
@@ -158,6 +204,7 @@ def create_session(user_id):
                (user_id, token, expires))
     db.commit()
     return token
+
 
 def get_current_user():
     auth = request.headers.get('Authorization', '')
@@ -172,6 +219,7 @@ def get_current_user():
     ''', (token, datetime.utcnow())).fetchone()
     return dict(row) if row else None
 
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -182,27 +230,27 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ─── Static File Serving ────────────────────────────────────────────
 
-STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
+# ─── Static File Serving ────────────────────────────────────────────
 
 @app.route('/')
 def serve_index():
     return send_from_directory(STATIC_DIR, 'index.html')
+
 
 @app.route('/<path:path>')
 def serve_static(path):
     full = os.path.join(STATIC_DIR, path)
     if os.path.isfile(full):
         return send_from_directory(STATIC_DIR, path)
-    # Fallback to index.html for SPA-style routing
     return send_from_directory(STATIC_DIR, 'index.html')
+
 
 # ─── Auth API ───────────────────────────────────────────────────────
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.get_json()
+    data = request.get_json() or {}
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     password = data.get('password') or ''
@@ -218,12 +266,12 @@ def register():
         return jsonify({'error': 'Email sudah terdaftar. Silakan masuk.'}), 409
 
     pw_hash = hash_password(password)
-    cursor = db.execute(
-        'INSERT INTO users (name, email, password_hash, provider) VALUES (?, ?, ?, ?)',
-        (name, email, pw_hash, 'email'))
+    row = db.execute(
+        'INSERT INTO users (name, email, password_hash, provider) VALUES (?, ?, ?, ?) RETURNING id',
+        (name, email, pw_hash, 'email')).fetchone()
     db.commit()
+    user_id = row['id'] if isinstance(row, dict) else row[0]
 
-    user_id = cursor.lastrowid
     token = create_session(user_id)
 
     return jsonify({
@@ -231,9 +279,10 @@ def register():
         'user': {'name': name, 'email': email, 'avatar': None, 'provider': 'email'}
     }), 201
 
+
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = (data.get('email') or '').strip().lower()
     password = data.get('password') or ''
 
@@ -257,9 +306,10 @@ def login():
         }
     })
 
+
 @app.route('/api/google-login', methods=['POST'])
 def google_login():
-    data = request.get_json()
+    data = request.get_json() or {}
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     avatar = data.get('avatar')
@@ -275,11 +325,11 @@ def google_login():
         db.execute('UPDATE users SET name = ?, avatar = ? WHERE id = ?', (name, avatar, user_id))
         db.commit()
     else:
-        cursor = db.execute(
-            'INSERT INTO users (name, email, avatar, provider) VALUES (?, ?, ?, ?)',
-            (name, email, avatar, 'google'))
+        row = db.execute(
+            'INSERT INTO users (name, email, avatar, provider) VALUES (?, ?, ?, ?) RETURNING id',
+            (name, email, avatar, 'google')).fetchone()
         db.commit()
-        user_id = cursor.lastrowid
+        user_id = row['id'] if isinstance(row, dict) else row[0]
 
     token = create_session(user_id)
 
@@ -288,27 +338,29 @@ def google_login():
         'user': {'name': name, 'email': email, 'avatar': avatar, 'provider': 'google'}
     })
 
+
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
-    auth = request.headers.get('Authorization', '')
-    token = auth[7:]
+    token = request.headers.get('Authorization', '')[7:]
     db = get_db()
     db.execute('DELETE FROM sessions WHERE token = ?', (token,))
     db.commit()
     return jsonify({'message': 'Logged out'})
+
 
 @app.route('/api/me', methods=['GET'])
 @login_required
 def get_me():
     return jsonify({'user': g.user})
 
+
 # ─── Calorie Profile API ───────────────────────────────────────────
 
 @app.route('/api/calorie-profile', methods=['POST'])
 @login_required
 def save_calorie_profile():
-    data = request.get_json()
+    data = request.get_json() or {}
     db = get_db()
     db.execute('''
         INSERT INTO calorie_profiles
@@ -324,6 +376,7 @@ def save_calorie_profile():
     db.commit()
     return jsonify({'message': 'Profile saved'})
 
+
 @app.route('/api/calorie-profile', methods=['GET'])
 @login_required
 def get_calorie_profile():
@@ -331,9 +384,21 @@ def get_calorie_profile():
     row = db.execute('''
         SELECT * FROM calorie_profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1
     ''', (g.user['id'],)).fetchone()
-    if row:
-        return jsonify(dict(row))
-    return jsonify(None)
+    return jsonify(dict(row) if row else None, default=str) if False else (
+        jsonify(_serialize(row)) if row else jsonify(None)
+    )
+
+
+def _serialize(row):
+    """Convert row to JSON-safe dict (handle datetimes)."""
+    if row is None:
+        return None
+    d = dict(row)
+    for k, v in d.items():
+        if isinstance(v, (datetime,)) or hasattr(v, 'isoformat'):
+            d[k] = v.isoformat() if hasattr(v, 'isoformat') else str(v)
+    return d
+
 
 # ─── Food Log API ──────────────────────────────────────────────────
 
@@ -345,12 +410,13 @@ def get_food_logs():
     rows = db.execute(
         'SELECT * FROM food_logs WHERE user_id = ? AND logged_date = ? ORDER BY created_at',
         (g.user['id'], date)).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([_serialize(r) for r in rows])
+
 
 @app.route('/api/food-logs', methods=['POST'])
 @login_required
 def add_food_log():
-    data = request.get_json()
+    data = request.get_json() or {}
     calories = data.get('calories')
     label = data.get('label', '')
     date = data.get('date', datetime.utcnow().strftime('%Y-%m-%d'))
@@ -359,12 +425,14 @@ def add_food_log():
         return jsonify({'error': 'Kalori harus berupa angka.'}), 400
 
     db = get_db()
-    cursor = db.execute(
-        'INSERT INTO food_logs (user_id, calories, label, logged_date) VALUES (?, ?, ?, ?)',
-        (g.user['id'], int(calories), label, date))
+    row = db.execute(
+        'INSERT INTO food_logs (user_id, calories, label, logged_date) VALUES (?, ?, ?, ?) RETURNING id',
+        (g.user['id'], int(calories), label, date)).fetchone()
     db.commit()
+    log_id = row['id'] if isinstance(row, dict) else row[0]
 
-    return jsonify({'id': cursor.lastrowid, 'calories': int(calories), 'label': label, 'logged_date': date}), 201
+    return jsonify({'id': log_id, 'calories': int(calories), 'label': label, 'logged_date': date}), 201
+
 
 @app.route('/api/food-logs/<int:log_id>', methods=['DELETE'])
 @login_required
@@ -373,6 +441,7 @@ def delete_food_log(log_id):
     db.execute('DELETE FROM food_logs WHERE id = ? AND user_id = ?', (log_id, g.user['id']))
     db.commit()
     return jsonify({'message': 'Deleted'})
+
 
 # ─── Water Log API ─────────────────────────────────────────────────
 
@@ -384,22 +453,24 @@ def get_water_log():
     row = db.execute(
         'SELECT * FROM water_logs WHERE user_id = ? AND logged_date = ?',
         (g.user['id'], date)).fetchone()
-    return jsonify(dict(row) if row else {'glasses': 0})
+    return jsonify(_serialize(row) if row else {'glasses': 0})
+
 
 @app.route('/api/water-logs', methods=['POST'])
 @login_required
 def update_water_log():
-    data = request.get_json()
-    glasses = data.get('glasses', 0)
+    data = request.get_json() or {}
+    glasses = int(data.get('glasses', 0))
     date = data.get('date', datetime.utcnow().strftime('%Y-%m-%d'))
 
     db = get_db()
     db.execute('''
         INSERT INTO water_logs (user_id, glasses, logged_date) VALUES (?, ?, ?)
-        ON CONFLICT(user_id, logged_date) DO UPDATE SET glasses = excluded.glasses
+        ON CONFLICT(user_id, logged_date) DO UPDATE SET glasses = EXCLUDED.glasses
     ''', (g.user['id'], glasses, date))
     db.commit()
     return jsonify({'glasses': glasses, 'logged_date': date})
+
 
 # ─── Workout Log API ──────────────────────────────────────────────
 
@@ -411,12 +482,13 @@ def get_workout_logs():
     rows = db.execute(
         'SELECT * FROM workout_logs WHERE user_id = ? AND logged_date = ?',
         (g.user['id'], date)).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([_serialize(r) for r in rows])
+
 
 @app.route('/api/workout-logs', methods=['POST'])
 @login_required
 def save_workout_log():
-    data = request.get_json()
+    data = request.get_json() or {}
     exercise_name = data.get('exercise_name', '')
     completed = 1 if data.get('completed') else 0
     date = data.get('date', datetime.utcnow().strftime('%Y-%m-%d'))
@@ -427,13 +499,15 @@ def save_workout_log():
         (g.user['id'], exercise_name, date)).fetchone()
 
     if existing:
-        db.execute('UPDATE workout_logs SET completed = ? WHERE id = ?', (completed, existing['id']))
+        existing_id = existing['id'] if isinstance(existing, dict) else existing[0]
+        db.execute('UPDATE workout_logs SET completed = ? WHERE id = ?', (completed, existing_id))
     else:
         db.execute(
             'INSERT INTO workout_logs (user_id, exercise_name, completed, logged_date) VALUES (?, ?, ?, ?)',
             (g.user['id'], exercise_name, completed, date))
     db.commit()
     return jsonify({'message': 'Saved'})
+
 
 # ─── Favorite Menus API ───────────────────────────────────────────
 
@@ -445,10 +519,11 @@ def get_favorites():
         'SELECT menu_id FROM favorite_menus WHERE user_id = ?', (g.user['id'],)).fetchall()
     return jsonify([r['menu_id'] for r in rows])
 
+
 @app.route('/api/favorites', methods=['POST'])
 @login_required
 def toggle_favorite():
-    data = request.get_json()
+    data = request.get_json() or {}
     menu_id = data.get('menu_id')
 
     db = get_db()
@@ -457,7 +532,8 @@ def toggle_favorite():
         (g.user['id'], menu_id)).fetchone()
 
     if existing:
-        db.execute('DELETE FROM favorite_menus WHERE id = ?', (existing['id'],))
+        existing_id = existing['id'] if isinstance(existing, dict) else existing[0]
+        db.execute('DELETE FROM favorite_menus WHERE id = ?', (existing_id,))
         db.commit()
         return jsonify({'favorited': False})
     else:
@@ -467,46 +543,48 @@ def toggle_favorite():
         db.commit()
         return jsonify({'favorited': True})
 
+
 # ─── Progress Summary API ─────────────────────────────────────────
 
 @app.route('/api/progress', methods=['GET'])
 @login_required
 def get_progress():
     days = int(request.args.get('days', 7))
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
     db = get_db()
     user_id = g.user['id']
 
-    # Daily calorie totals
-    food_data = db.execute('''
-        SELECT logged_date, SUM(calories) as total_cal, COUNT(*) as meal_count
-        FROM food_logs WHERE user_id = ? AND logged_date >= date('now', ?)
+    food = db.execute('''
+        SELECT logged_date, SUM(calories) AS total_cal, COUNT(*) AS meal_count
+        FROM food_logs WHERE user_id = ? AND logged_date >= ?
         GROUP BY logged_date ORDER BY logged_date
-    ''', (user_id, f'-{days} days')).fetchall()
+    ''', (user_id, cutoff)).fetchall()
 
-    # Water data
-    water_data = db.execute('''
+    water = db.execute('''
         SELECT logged_date, glasses FROM water_logs
-        WHERE user_id = ? AND logged_date >= date('now', ?)
+        WHERE user_id = ? AND logged_date >= ?
         ORDER BY logged_date
-    ''', (user_id, f'-{days} days')).fetchall()
+    ''', (user_id, cutoff)).fetchall()
 
-    # Workout completion
-    workout_data = db.execute('''
-        SELECT logged_date, COUNT(*) as total, SUM(completed) as done
-        FROM workout_logs WHERE user_id = ? AND logged_date >= date('now', ?)
+    workouts = db.execute('''
+        SELECT logged_date, COUNT(*) AS total, SUM(completed) AS done
+        FROM workout_logs WHERE user_id = ? AND logged_date >= ?
         GROUP BY logged_date ORDER BY logged_date
-    ''', (user_id, f'-{days} days')).fetchall()
+    ''', (user_id, cutoff)).fetchall()
 
     return jsonify({
-        'food': [dict(r) for r in food_data],
-        'water': [dict(r) for r in water_data],
-        'workouts': [dict(r) for r in workout_data]
+        'food': [_serialize(r) for r in food],
+        'water': [_serialize(r) for r in water],
+        'workouts': [_serialize(r) for r in workouts],
     })
 
-# ─── Initialize & Run ─────────────────────────────────────────────
+
+# ─── Entry Point ─────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
-    print("[OK] Database initialized: nourish.db")
+    _db_initialized = True
+    backend = 'Postgres' if USE_POSTGRES else 'SQLite'
+    print(f"[OK] Database initialized ({backend})")
     print("[OK] NOURISH server running at http://localhost:8080")
     app.run(host='0.0.0.0', port=8080, debug=True)

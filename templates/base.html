@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NOURISH — Program Diet & Latihan Personalisasi{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav id="navbar">
+        <a href="{{ url_for('home') }}" class="nav-logo">NOURI<span>SH</span></a>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="{{ url_for('kalkulator') }}">Kalkulator</a></li>
+            <li><a href="{{ url_for('menu_diet') }}">Menu Diet</a></li>
+            <li><a href="{{ url_for('latihan') }}">Latihan</a></li>
+            <li><a href="{{ url_for('tracker') }}">Tracker</a></li>
+            <li><a href="{{ url_for('tips') }}">Tips</a></li>
+        </ul>
+        <div class="nav-auth" id="navAuth">
+            <button class="btn-login" onclick="openAuth('login')">Masuk</button>
+            <button class="btn-register" onclick="openAuth('register')">Daftar</button>
+        </div>
+        <div class="nav-user" id="navUser" style="display:none">
+            <span class="nav-user-name" id="navUserName"></span>
+            <img class="nav-user-avatar" id="navUserAvatar" src="" alt="User" onclick="toggleDropdown()">
+            <div class="nav-user-dropdown" id="userDropdown">
+                <div class="dropdown-header">
+                    <div class="nav-user-name" style="max-width:none;font-size:15px" id="dropdownName"></div>
+                    <div class="dropdown-email" id="dropdownEmail"></div>
+                </div>
+                <button class="dropdown-item" onclick="window.location.href='{{ url_for('tracker') }}'">&#128200; Dashboard Saya</button>
+                <button class="dropdown-item" onclick="window.location.href='{{ url_for('kalkulator') }}'">&#9889; Kalkulator Kalori</button>
+                <button class="dropdown-item logout" onclick="handleLogout()">&#10140; Keluar</button>
+            </div>
+        </div>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+    </nav>
+
+    <!-- Auth Modal -->
+    <div class="auth-overlay" id="authOverlay" onclick="closeAuthIfOutside(event)">
+        <div class="auth-modal">
+            <button class="auth-close" onclick="closeAuth()">&times;</button>
+            <div class="auth-header">
+                <div class="nav-logo">NOURI<span>SH</span></div>
+                <h2 id="authTitle">Masuk ke Akun</h2>
+                <p id="authSubtitle">Mulai perjalanan sehat Anda bersama kami</p>
+            </div>
+
+            <div class="auth-error" id="authError"></div>
+            <div class="auth-success" id="authSuccess"></div>
+
+            <button class="google-btn" onclick="handleGoogleSignIn()">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Lanjutkan dengan Google
+            </button>
+
+            <div class="auth-divider">atau</div>
+
+            <form class="auth-form" id="loginForm" onsubmit="handleEmailLogin(event)">
+                <div class="auth-input-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="nama@email.com" required>
+                </div>
+                <div class="auth-input-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" placeholder="Masukkan password" required>
+                </div>
+                <button type="submit" class="auth-submit">Masuk</button>
+            </form>
+
+            <form class="auth-form" id="registerForm" style="display:none" onsubmit="handleEmailRegister(event)">
+                <div class="auth-input-group">
+                    <label>Nama Lengkap</label>
+                    <input type="text" id="registerName" placeholder="Nama lengkap Anda" required>
+                </div>
+                <div class="auth-input-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="nama@email.com" required>
+                </div>
+                <div class="auth-input-group">
+                    <label>Password</label>
+                    <input type="password" id="registerPassword" placeholder="Min. 8 karakter" minlength="8" required>
+                </div>
+                <div class="auth-input-group">
+                    <label>Konfirmasi Password</label>
+                    <input type="password" id="registerConfirm" placeholder="Ulangi password" required>
+                </div>
+                <button type="submit" class="auth-submit">Buat Akun</button>
+            </form>
+
+            <div class="auth-switch" id="authSwitch">
+                Belum punya akun? <a onclick="switchAuth('register')">Daftar di sini</a>
+            </div>
+        </div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="{{ url_for('home') }}" class="nav-logo">NOURI<span>SH</span></a>
+                <p>Program diet dan latihan profesional untuk transformasi tubuh yang sehat dan berkelanjutan. Dirancang oleh certified trainer.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Fitur</h4>
+                <ul>
+                    <li><a href="{{ url_for('kalkulator') }}">Kalkulator Kalori</a></li>
+                    <li><a href="{{ url_for('kalkulator') }}#meal-plan">Rencana Makan</a></li>
+                    <li><a href="{{ url_for('latihan') }}">Jadwal Latihan</a></li>
+                    <li><a href="{{ url_for('tracker') }}">Progress Tracker</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Program</h4>
+                <ul>
+                    <li><a href="{{ url_for('latihan') }}">Pemula</a></li>
+                    <li><a href="{{ url_for('latihan') }}">Menengah</a></li>
+                    <li><a href="{{ url_for('latihan') }}">Lanjutan</a></li>
+                    <li><a href="#">Custom Plan</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Disclaimer</h4>
+                <ul>
+                    <li style="line-height:1.6;opacity:0.6;cursor:default">Program ini bersifat panduan umum. Konsultasikan dengan dokter atau ahli gizi sebelum memulai program diet.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2026 NOURISH. Dirancang oleh Professional Trainer.</span>
+            <span>Privacy Policy &middot; Terms of Service</span>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

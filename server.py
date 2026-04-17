@@ -14,10 +14,11 @@ import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, request, jsonify, send_from_directory, g
+from flask import Flask, request, jsonify, send_from_directory, render_template, g
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+# Flask defaults: templates/ and static/ directories auto-wired.
+app = Flask(__name__)
 CORS(app)
 
 # ─── DB Selection ───────────────────────────────────────────────────
@@ -231,19 +232,36 @@ def login_required(f):
     return decorated
 
 
-# ─── Static File Serving ────────────────────────────────────────────
+# ─── Page Routes (Jinja templates) ──────────────────────────────────
 
 @app.route('/')
-def serve_index():
-    return send_from_directory(STATIC_DIR, 'index.html')
+def home():
+    return render_template('home.html')
 
 
-@app.route('/<path:path>')
-def serve_static(path):
-    full = os.path.join(STATIC_DIR, path)
-    if os.path.isfile(full):
-        return send_from_directory(STATIC_DIR, path)
-    return send_from_directory(STATIC_DIR, 'index.html')
+@app.route('/kalkulator')
+def kalkulator():
+    return render_template('kalkulator.html')
+
+
+@app.route('/menu-diet')
+def menu_diet():
+    return render_template('menu-diet.html')
+
+
+@app.route('/latihan')
+def latihan():
+    return render_template('latihan.html')
+
+
+@app.route('/tracker')
+def tracker():
+    return render_template('tracker.html')
+
+
+@app.route('/tips')
+def tips():
+    return render_template('tips.html')
 
 
 # ─── Auth API ───────────────────────────────────────────────────────

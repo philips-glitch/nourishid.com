@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Kalkulator Kalori — NOURISH{% endblock %}
+
+{% block content %}
+    <!-- Calorie Calculator Section -->
+    <section class="section" id="calculator" style="padding-top:120px">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tag">Langkah Pertama</div>
+                <h2>Kalkulator Kebutuhan Kalori</h2>
+                <p>Hitung kebutuhan kalori harian Anda berdasarkan data tubuh dan level aktivitas untuk merancang program diet yang tepat.</p>
+            </div>
+
+            <div class="calc-layout">
+                <div class="calc-form-card">
+                    <form id="calorieForm">
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="gender">Jenis Kelamin</label>
+                                <div class="gender-toggle">
+                                    <input type="radio" name="gender" id="male" value="male" checked>
+                                    <label for="male" class="gender-btn">
+                                        <span class="gender-icon">&#9794;</span> Pria
+                                    </label>
+                                    <input type="radio" name="gender" id="female" value="female">
+                                    <label for="female" class="gender-btn">
+                                        <span class="gender-icon">&#9792;</span> Wanita
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="age">Usia (tahun)</label>
+                                <input type="number" id="age" min="15" max="80" placeholder="25" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="height">Tinggi Badan (cm)</label>
+                                <input type="number" id="height" min="100" max="250" placeholder="170" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="weight">Berat Badan (kg)</label>
+                                <input type="number" id="weight" min="30" max="250" step="0.1" placeholder="70" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="targetWeight">Target Berat (kg)</label>
+                                <input type="number" id="targetWeight" min="30" max="250" step="0.1" placeholder="65">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="activity">Level Aktivitas</label>
+                            <select id="activity" required>
+                                <option value="" disabled selected>Pilih level aktivitas</option>
+                                <option value="1.2">Sedentary (jarang olahraga)</option>
+                                <option value="1.375">Ringan (olahraga 1-3x/minggu)</option>
+                                <option value="1.55">Sedang (olahraga 3-5x/minggu)</option>
+                                <option value="1.725">Aktif (olahraga 6-7x/minggu)</option>
+                                <option value="1.9">Sangat Aktif (olahraga 2x sehari)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="goal">Tujuan Diet</label>
+                            <select id="goal" required>
+                                <option value="" disabled selected>Pilih tujuan</option>
+                                <option value="lose-fast">Turun Berat Cepat (-1 kg/minggu)</option>
+                                <option value="lose">Turun Berat (-0.5 kg/minggu)</option>
+                                <option value="maintain">Pertahankan Berat</option>
+                                <option value="gain">Naik Berat (+0.5 kg/minggu)</option>
+                                <option value="gain-fast">Naik Berat Cepat (+1 kg/minggu)</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn-primary btn-block">
+                            Hitung Kebutuhan Kalori &rarr;
+                        </button>
+                    </form>
+                </div>
+
+                <div class="calc-result-card" id="resultCard">
+                    <div class="result-placeholder" id="resultPlaceholder">
+                        <div class="placeholder-icon">&#127793;</div>
+                        <h3>Hasil Perhitungan</h3>
+                        <p>Isi form di samping untuk melihat kebutuhan kalori harian Anda beserta rekomendasi makronutrien.</p>
+                        <span class="hero-handwritten" style="display:inline-block;margin-top:12px">mulai perjalanan sehatmu di sini &hearts;</span>
+                    </div>
+                    <div class="result-content" id="resultContent" style="display:none">
+                        <div class="result-header-area">
+                            <div class="result-label">Kebutuhan Kalori Harian Anda</div>
+                            <div class="calorie-display">
+                                <span class="calorie-number" id="dailyCalories">0</span>
+                                <span class="calorie-unit">kkal/hari</span>
+                            </div>
+                        </div>
+
+                        <div class="result-details">
+                            <div class="detail-item">
+                                <span class="detail-label">BMR (Metabolisme Basal)</span>
+                                <span class="detail-value" id="bmrValue">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">TDEE (Total Pengeluaran)</span>
+                                <span class="detail-value" id="tdeeValue">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">BMI (Indeks Massa Tubuh)</span>
+                                <span class="detail-value" id="bmiValue">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Kategori BMI</span>
+                                <span class="detail-value bmi-badge" id="bmiCategory">-</span>
+                            </div>
+                            <div class="detail-item" id="timeEstimate" style="display:none">
+                                <span class="detail-label">Estimasi Waktu ke Target</span>
+                                <span class="detail-value" id="timeValue">-</span>
+                            </div>
+                        </div>
+
+                        <div class="macro-section">
+                            <h4>Rekomendasi Makronutrien</h4>
+                            <div class="macro-grid">
+                                <div class="macro-card macro-protein">
+                                    <div class="macro-icon">&#129385;</div>
+                                    <div class="macro-name">Protein</div>
+                                    <div class="macro-value" id="proteinValue">0g</div>
+                                    <div class="macro-percent" id="proteinPercent">30%</div>
+                                    <div class="macro-bar-sm"><div class="macro-fill-sm" id="proteinBar"></div></div>
+                                </div>
+                                <div class="macro-card macro-carbs">
+                                    <div class="macro-icon">&#127834;</div>
+                                    <div class="macro-name">Karbohidrat</div>
+                                    <div class="macro-value" id="carbsValue">0g</div>
+                                    <div class="macro-percent" id="carbsPercent">40%</div>
+                                    <div class="macro-bar-sm"><div class="macro-fill-sm" id="carbsBar"></div></div>
+                                </div>
+                                <div class="macro-card macro-fats">
+                                    <div class="macro-icon">&#129361;</div>
+                                    <div class="macro-name">Lemak</div>
+                                    <div class="macro-value" id="fatsValue">0g</div>
+                                    <div class="macro-percent" id="fatsPercent">30%</div>
+                                    <div class="macro-bar-sm"><div class="macro-fill-sm" id="fatsBar"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="water-section">
+                            <h4>&#128167; Kebutuhan Air Harian</h4>
+                            <div class="water-display">
+                                <span id="waterValue">0</span> Liter
+                                <small>( <span id="waterGlasses">0</span> gelas )</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Meal Plan Section -->
+    <section class="section section-warm" id="meal-plan">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tag">Nutrisi</div>
+                <h2>Panduan Rencana Makan</h2>
+                <p>Contoh menu harian berdasarkan target kalori Anda. Pilih range kalori untuk melihat rekomendasi menu.</p>
+            </div>
+
+            <div class="meal-tabs">
+                <button class="meal-tab active" data-calories="1500">1500 kkal</button>
+                <button class="meal-tab" data-calories="1800">1800 kkal</button>
+                <button class="meal-tab" data-calories="2000">2000 kkal</button>
+                <button class="meal-tab" data-calories="2500">2500 kkal</button>
+            </div>
+
+            <div class="meal-timeline" id="mealTimeline">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/data.js') }}"></script>
+<script src="{{ url_for('static', filename='js/kalkulator.js') }}"></script>
+{% endblock %}

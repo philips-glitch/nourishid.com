@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Jadwal Latihan — NOURISH{% endblock %}
+
+{% block content %}
+    <!-- Workout Schedule Section -->
+    <section class="section" id="workout" style="padding-top:120px">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tag">Program Latihan</div>
+                <h2>Jadwal Latihan Mingguan</h2>
+                <p>Pilih kategori latihan dan level sesuai kemampuan Anda. Program lengkap Senin &ndash; Minggu.</p>
+            </div>
+
+            <div class="level-selector" style="margin-bottom:16px">
+                <button class="level-btn active" data-category="home">
+                    <span class="level-icon">&#127968;</span>
+                    <span class="level-name">Home Workout</span>
+                    <span class="level-desc">Tanpa alat, di rumah</span>
+                </button>
+                <button class="level-btn" data-category="gym">
+                    <span class="level-icon">&#127947;</span>
+                    <span class="level-name">Gym</span>
+                    <span class="level-desc">Dengan alat / beban</span>
+                </button>
+                <button class="level-btn" data-category="pilates">
+                    <span class="level-icon">&#129488;</span>
+                    <span class="level-name">Pilates</span>
+                    <span class="level-desc">Core, posture, fleksibilitas</span>
+                </button>
+            </div>
+
+            <div class="level-selector">
+                <button class="level-btn active" data-level="beginner">
+                    <span class="level-icon">&#127793;</span>
+                    <span class="level-name">Pemula</span>
+                    <span class="level-desc">Baru mulai berolahraga</span>
+                </button>
+                <button class="level-btn" data-level="intermediate">
+                    <span class="level-icon">&#128170;</span>
+                    <span class="level-name">Menengah</span>
+                    <span class="level-desc">Rutin 1-3 bulan</span>
+                </button>
+                <button class="level-btn" data-level="advanced">
+                    <span class="level-icon">&#128293;</span>
+                    <span class="level-name">Lanjutan</span>
+                    <span class="level-desc">Rutin &gt; 6 bulan</span>
+                </button>
+            </div>
+
+            <div class="workout-week" id="workoutWeek">
+                <!-- Filled by JS -->
+            </div>
+
+            <div class="workout-notes">
+                <h4>&#128221; Catatan Penting dari Trainer</h4>
+                <ul>
+                    <li>Selalu lakukan pemanasan 5-10 menit sebelum latihan</li>
+                    <li>Istirahat 30-60 detik antar set (pemula: 60-90 detik)</li>
+                    <li>Minum air putih sebelum, selama, dan setelah latihan</li>
+                    <li>Jika merasa pusing atau nyeri tajam, segera hentikan latihan</li>
+                    <li>Konsistensi lebih penting daripada intensitas tinggi</li>
+                </ul>
+                <span class="hero-handwritten" style="display:inline-block;margin-top:12px">ingat, progres &gt; sempurna!</span>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/data.js') }}"></script>
+<script src="{{ url_for('static', filename='js/latihan.js') }}"></script>
+{% endblock %}

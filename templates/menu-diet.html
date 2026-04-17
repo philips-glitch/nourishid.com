@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Menu Diet — NOURISH{% endblock %}
+
+{% block content %}
+    <!-- Menu Diet Section -->
+    <section class="section" id="menu-diet" style="padding-top:120px">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tag">Pilih Menu Anda</div>
+                <h2>Menu Diet <em>Lengkap</em></h2>
+                <p>Pilih menu sesuai kebutuhan diet Anda. Setiap menu dilengkapi resep lengkap dan informasi kalori serta makronutrien.</p>
+            </div>
+
+            <div class="diet-filters" id="mealFilters">
+                <button class="diet-filter-btn active" data-filter="all">Semua</button>
+                <button class="diet-filter-btn" data-filter="sarapan">&#127749; Sarapan</button>
+                <button class="diet-filter-btn" data-filter="siang">&#9728;&#65039; Makan Siang</button>
+                <button class="diet-filter-btn" data-filter="malam">&#127769; Makan Malam</button>
+                <button class="diet-filter-btn" data-filter="snack">&#127822; Snack</button>
+            </div>
+
+            <div class="diet-type-filters" id="dietTypeFilters">
+                <button class="diet-type-btn active" data-type="all">Semua Tipe</button>
+                <button class="diet-type-btn" data-type="low-carb">Low Carb</button>
+                <button class="diet-type-btn" data-type="high-protein">High Protein</button>
+                <button class="diet-type-btn" data-type="vegetarian">Vegetarian</button>
+                <button class="diet-type-btn" data-type="low-fat">Low Fat</button>
+                <button class="diet-type-btn" data-type="balanced">Balanced</button>
+            </div>
+
+            <div class="menu-grid" id="menuGrid">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Recipe Modal -->
+    <div class="recipe-overlay" id="recipeOverlay" onclick="closeRecipeIfOutside(event)">
+        <div class="recipe-modal" id="recipeModal">
+            <button class="recipe-close" onclick="closeRecipe()">&times;</button>
+            <div class="recipe-hero" id="recipeHero">
+                <div class="recipe-hero-overlay" id="recipeHeroBadges"></div>
+            </div>
+            <div class="recipe-body" id="recipeBody">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/data.js') }}"></script>
+<script src="{{ url_for('static', filename='js/menu-diet.js') }}"></script>
+{% endblock %}

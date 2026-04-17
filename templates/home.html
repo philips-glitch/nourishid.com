@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <div class="hero-bg-shape"></div>
+        <div class="hero-circle hero-circle-1"></div>
+        <div class="hero-circle hero-circle-2"></div>
+        <div class="hero-circle hero-circle-3"></div>
+
+        <div class="hero-content">
+            <div class="hero-tag">Professional Trainer Program</div>
+            <h1>
+                Makan sehat,<br>hidup <em>luar biasa.</em>
+                <span class="hero-handwritten">— tubuhmu akan berterima kasih</span>
+            </h1>
+            <p>Program diet terstruktur dengan kalkulator kalori presisi dan jadwal latihan rumahan yang dirancang oleh professional trainer untuk transformasi tubuh yang sehat dan berkelanjutan.</p>
+            <div class="hero-actions">
+                <a href="{{ url_for('kalkulator') }}" class="btn-primary">Hitung Kalori Saya &rarr;</a>
+                <a href="{{ url_for('latihan') }}" class="btn-secondary">Lihat Jadwal Latihan</a>
+            </div>
+        </div>
+
+        <div class="hero-visual">
+            <div class="hero-card">
+                <div class="hero-floating-badge">
+                    <span class="num">28</span>
+                    <span class="unit">hari plan</span>
+                </div>
+                <div class="hero-card-label">Nutrisi Hari Ini</div>
+                <div class="hero-card-title">Balanced Diet Indonesia</div>
+                <div class="macro-bars">
+                    <div class="macro-bar-item">
+                        <span class="macro-label">Protein</span>
+                        <div class="macro-track"><div class="macro-fill protein"></div></div>
+                        <span class="macro-val">120g</span>
+                    </div>
+                    <div class="macro-bar-item">
+                        <span class="macro-label">Karbohidrat</span>
+                        <div class="macro-track"><div class="macro-fill carbs"></div></div>
+                        <span class="macro-val">200g</span>
+                    </div>
+                    <div class="macro-bar-item">
+                        <span class="macro-label">Lemak</span>
+                        <div class="macro-track"><div class="macro-fill fats"></div></div>
+                        <span class="macro-val">55g</span>
+                    </div>
+                    <div class="macro-bar-item">
+                        <span class="macro-label">Serat</span>
+                        <div class="macro-track"><div class="macro-fill fiber"></div></div>
+                        <span class="macro-val">30g</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Strip -->
+    <div class="stats-strip">
+        <div class="stat-item">
+            <div class="stat-num"><span class="counter" data-target="500">0</span><span>+</span></div>
+            <div class="stat-label">Member Aktif</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-num"><span class="counter" data-target="95">0</span><span>%</span></div>
+            <div class="stat-label">Tingkat Keberhasilan</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-num"><span class="counter" data-target="200">0</span><span>+</span></div>
+            <div class="stat-label">Resep Tersedia</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-num">4.9<span>/5</span></div>
+            <div class="stat-label">Rating Member</div>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-box">
+            <h2>Siap transformasi<br><em>nutrisi Anda?</em></h2>
+            <p>Bergabung dengan ratusan member yang makan lebih baik, merasa lebih kuat, dan hidup lebih sehat setiap hari.</p>
+            <a href="{{ url_for('kalkulator') }}" class="btn-primary btn-lg">Mulai Hitung Kalori Sekarang &rarr;</a>
+        </div>
+    </section>
+{% endblock %}

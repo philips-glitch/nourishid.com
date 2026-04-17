@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Tracker Harian — NOURISH{% endblock %}
+
+{% block content %}
+    <!-- Progress Tracker -->
+    <section class="section section-forest" id="tracker" style="padding-top:120px">
+        <div class="container">
+            <div class="section-header section-header-light">
+                <div class="section-tag section-tag-light">Pantau Progres</div>
+                <h2>Tracker Harian Anda</h2>
+                <p>Catat asupan kalori dan air harian Anda untuk memantau konsistensi program diet.</p>
+            </div>
+
+            <div class="tracker-grid">
+                <div class="tracker-card">
+                    <h4>&#127860; Asupan Kalori Hari Ini</h4>
+                    <div class="tracker-input-group">
+                        <input type="number" id="foodInput" placeholder="Kalori makanan...">
+                        <button class="btn-primary btn-sm" onclick="addFood()">Tambah</button>
+                    </div>
+                    <div class="tracker-log" id="foodLog"></div>
+                    <div class="tracker-total">
+                        <span>Total: <strong id="totalCaloriesTracker">0</strong> kkal</span>
+                        <div class="progress-ring-container">
+                            <svg class="progress-ring" width="80" height="80">
+                                <circle class="progress-ring-bg" cx="40" cy="40" r="35"/>
+                                <circle class="progress-ring-fill" id="calorieRing" cx="40" cy="40" r="35"/>
+                            </svg>
+                            <span class="progress-ring-text" id="caloriePercent">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tracker-card">
+                    <h4>&#128167; Asupan Air Hari Ini</h4>
+                    <div class="water-tracker">
+                        <div class="water-glasses" id="waterTracker"></div>
+                        <p class="water-count">
+                            <span id="waterCount">0</span> / 8 gelas (250ml)
+                        </p>
+                    </div>
+                </div>
+
+                <div class="tracker-card">
+                    <h4>&#9989; Checklist Latihan Hari Ini</h4>
+                    <div class="workout-checklist" id="workoutChecklist"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/data.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tracker.js') }}"></script>
+{% endblock %}
